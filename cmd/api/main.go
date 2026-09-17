@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/config"
+	"github.com/sahil_malakar/production_grade_golang_setup/internal/handlers"
 )
 
 func main() {
@@ -19,11 +20,7 @@ func main() {
 
 	// Registers the GET /health route and executes this function
 	// whenever a request is made to that endpoint.
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
-	})
+	mux.HandleFunc("GET /health", handlers.Health)
 
 	log.Printf("Server is listening on http://localhost:%v", cfg.Port)
 
