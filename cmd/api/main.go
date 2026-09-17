@@ -6,13 +6,23 @@ import (
 	"net/http"
 
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/config"
+	"github.com/sahil_malakar/production_grade_golang_setup/internal/db"
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/handlers"
 )
 
 func main() {
 	cfg := config.MustLoad()
 
-	fmt.Println("go app server is running!!..")
+	db, err := db.DbConnect(cfg.DatabaseURL, cfg.DB)
+	if err != nil {
+		log.Fatalf("Database connection failed: %v", err)
+	}
+
+	log.Println("Database connection established")
+
+	defer db.Close()
+
+	fmt.Println("App server is running..")
 
 	// Creates a router that receives incoming requests
 	// and forwards them to the handler registered for the matching route.
@@ -28,9 +38,9 @@ func main() {
 	srv := http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      mux,
-		ReadTimeout:  cfg.ReadTimeout,
-		WriteTimeout: cfg.WriteTimeout,
-		IdleTimeout:  cfg.IdleTimeout,
+		ReadTimeout:  cfg.HTTP.ReadTimeout,
+		WriteTimeout: cfg.HTTP.WriteTimeout,
+		IdleTimeout:  cfg.HTTP.IdleTimeout,
 	}
 
 	// Starts the server and keeps the application running while it accepts requests.
