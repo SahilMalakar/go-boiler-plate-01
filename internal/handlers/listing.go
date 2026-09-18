@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/sahil_malakar/production_grade_golang_setup/internal/httpx"
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/middleware"
 )
 
@@ -58,7 +59,12 @@ func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
 			 LIMIT 50`)
 	if err != nil {
 		this.logger.Error("db.Query failed", "error", err, "request_id", reqId)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		httpx.Error(
+			w,
+			http.StatusInternalServerError,
+			"something went wrong",
+			httpx.CodeInternalError,
+		)
 		return
 	}
 	this.logger.Debug("db.Query executed successfully", "request_id", reqId)
@@ -77,14 +83,24 @@ func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
 			&l.CreatedAt,
 		); err != nil {
 			this.logger.Error("rows.Scan failed", "error", err, "request_id", reqId)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			httpx.Error(
+				w,
+				http.StatusInternalServerError,
+				"something went wrong",
+				httpx.CodeInternalError,
+			)
 			return
 		}
 		listings = append(listings, l)
 	}
 	if err := rows.Err(); err != nil {
 		this.logger.Error("rows.Err failed", "error", err, "request_id", reqId)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		httpx.Error(
+			w,
+			http.StatusInternalServerError,
+			"something went wrong",
+			httpx.CodeInternalError,
+		)
 		return
 	}
 
@@ -115,7 +131,12 @@ func (this ListingHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		this.logger.Error("delete failed", "error", err, "id", id, "request_id", reqId)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		httpx.Error(
+			w,
+			http.StatusInternalServerError,
+			"something went wrong",
+			httpx.CodeInternalError,
+		)
 		return
 	}
 
