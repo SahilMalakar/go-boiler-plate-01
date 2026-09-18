@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/sahil_malakar/production_grade_golang_setup/internal/middleware"
 )
 
 // acting as a data structure to  append
@@ -46,6 +48,7 @@ func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Use the request-scoped context so the database query
 	// is cancelled if the client disconnects or the request ends.
 	ctx := r.Context()
+	reqId := middleware.RequestIDFromContext(ctx)
 
 	rows, err := this.db.QueryContext(
 		ctx,
@@ -54,13 +57,11 @@ func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
 			 ORDER BY created_at DESC
 			 LIMIT 50`)
 	if err != nil {
-		this.logger.Error("db.Query failed", "error", err)
+		this.logger.Error("db.Query failed", "error", err, "request_id", reqId)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-
-	this.logger.Debug("db.Query executed successfully")
-
+	this.logger.Debug("db.Query executed successfully", "request_id", reqId)
 	// run at the last to close the connections
 	defer rows.Close()
 
@@ -75,19 +76,19 @@ func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
 			&l.City,
 			&l.CreatedAt,
 		); err != nil {
-			this.logger.Error("rows.Scan failed", "error", err)
+			this.logger.Error("rows.Scan failed", "error", err, "request_id", reqId)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		listings = append(listings, l)
 	}
 	if err := rows.Err(); err != nil {
-		this.logger.Error("rows.Err failed", "error", err)
+		this.logger.Error("rows.Err failed", "error", err, "request_id", reqId)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	this.logger.Info("listings fetched successfully", "count", len(listings))
+	this.logger.Info("listings fetched successfully", "count", len(listings), "request_id", reqId)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -101,11 +102,11 @@ func (this ListingHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	this.logger.Debug("deleting listing")
 
 	ctx := r.Context()
+	reqId := middleware.RequestIDFromContext(ctx)
 
 	id := r.PathValue("id")
 
-	this.logger.Debug("listing id extracted", "id", id)
-
+	this.logger.Debug("listing id extracted", "id", id, "request_id", reqId)
 	_, err := this.db.ExecContext(
 		ctx,
 		`DELETE FROM listings
@@ -113,12 +114,12 @@ func (this ListingHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		this.logger.Error("delete failed", "error", err, "id", id)
+		this.logger.Error("delete failed", "error", err, "id", id, "request_id", reqId)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	this.logger.Info("listing deleted successfully", "id", id)
+	this.logger.Info("listing deleted successfully", "id", id, "request_id", reqId)
 
 	w.WriteHeader(http.StatusNoContent)
 }

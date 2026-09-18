@@ -9,6 +9,7 @@ import (
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/config"
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/db"
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/handlers"
+	"github.com/sahil_malakar/production_grade_golang_setup/internal/middleware"
 )
 
 func main() {
@@ -73,7 +74,7 @@ func main() {
 	// Creates the HTTP server and configures how it accepts and handles requests.
 	srv := http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      mux,
+		Handler:      middleware.RequestId(mux), // wrapping middleware in the router handler
 		ReadTimeout:  cfg.HTTP.ReadTimeout,
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout,
