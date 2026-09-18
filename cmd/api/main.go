@@ -31,6 +31,7 @@ func main() {
 	// Registers the GET /health route and executes this function
 	// whenever a request is made to that endpoint.
 	mux.HandleFunc("GET /health", handlers.Health)
+	mux.HandleFunc("GET /listings", handlers.List(db))
 
 	log.Printf("Server is listening on http://localhost:%v", cfg.Port)
 
