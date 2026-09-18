@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/httpx"
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/middleware"
 )
@@ -26,17 +27,23 @@ type listing struct {
 // to fix dependency injection problem
 // listing class
 type ListingHandler struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db       *sql.DB
+	logger   *slog.Logger
+	validate *validator.Validate
 }
 
 // contructor of listing class
 // --> go idioms name of contructor start with New
-func NewListingHandler(db *sql.DB, logger *slog.Logger) *ListingHandler {
+func NewListingHandler(
+	db *sql.DB,
+	logger *slog.Logger,
+	validate *validator.Validate,
+) *ListingHandler {
 	return &ListingHandler{
 		// private readonly
-		db:     db,
-		logger: logger,
+		db:       db,
+		logger:   logger,
+		validate: validate,
 	}
 }
 
@@ -151,12 +158,11 @@ func (this ListingHandler) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	reqId := middleware.RequestIDFromContext(ctx)
 
-	var reqBody listing
+	var reqBody CreateListingDTO
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		this.logger.Error(
 			"failed to decode create list body",
 			"error", err,
-			"id", reqBody.ID,
 			"request_id", reqId,
 		)
 		httpx.Error(
@@ -164,6 +170,21 @@ func (this ListingHandler) Create(w http.ResponseWriter, r *http.Request) {
 			http.StatusBadRequest,
 			"invalid request body",
 			httpx.CodeMalformedJSON,
+		)
+		return
+	}
+
+	if err := this.validate.Struct(reqBody); err != nil {
+		this.logger.Error(
+			"failed to validate create list body",
+			"error", err,
+			"request_id", reqId,
+		)
+		httpx.Error(
+			w,
+			http.StatusUnprocessableEntity,
+			"invalid request body",
+			httpx.CodeValidationFailed,
 		)
 		return
 	}
@@ -192,7 +213,7 @@ func (this ListingHandler) Create(w http.ResponseWriter, r *http.Request) {
 		this.logger.Error(
 			"failed to insert list body",
 			"error", err,
-			"id", reqBody.ID,
+			"id", createdListing.ID,
 			"request_id", reqId,
 		)
 		httpx.Error(

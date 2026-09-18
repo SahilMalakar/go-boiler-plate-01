@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/config"
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/db"
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/handlers"
@@ -56,6 +57,9 @@ func main() {
 
 	logger.Info("App server is running..")
 
+	// initialized validator
+	validate := validator.New()
+
 	// Creates a router that receives incoming requests
 	// and forwards them to the handler registered for the matching route.
 	mux := http.NewServeMux()
@@ -63,6 +67,7 @@ func main() {
 	listingHandler := handlers.NewListingHandler(
 		db,
 		logger,
+		validate,
 	)
 
 	// Registers the GET /health route and executes this function
