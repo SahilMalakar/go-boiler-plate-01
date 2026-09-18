@@ -40,7 +40,12 @@ func NewListingHandler(db *sql.DB) *ListingHandler {
 // we use golang methods
 // in general this fuctions are termed as method function in opps terminology
 func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
-	rows, err := this.db.Query(
+	// Use the request-scoped context so the database query
+	// is cancelled if the client disconnects or the request ends.
+	ctx := r.Context()
+
+	rows, err := this.db.QueryContext(
+		ctx,
 		`SELECT id, title, description, price, city, created_at
 		     FROM listings
 		     ORDER BY created_at DESC
@@ -53,7 +58,7 @@ func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// run at the last to close the connections
 	defer rows.Close()
 
-	listings := []listing{}
+	listings := make([]listing, 0, 50)
 	for rows.Next() {
 		var l listing
 		if err := rows.Scan(
@@ -87,9 +92,11 @@ func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (this ListingHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	id := r.PathValue("id")
 
-	_, err := this.db.Exec(
+	_, err := this.db.ExecContext(
+		ctx,
 		`DELETE FROM listings
 			WHERE id = $1`, id,
 	)
