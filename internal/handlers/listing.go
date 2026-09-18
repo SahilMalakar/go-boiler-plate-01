@@ -3,7 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -21,18 +21,19 @@ type listing struct {
 
 // Converted closure factory patter to constructor factory pattern
 // to fix dependency injection problem
-
 // listing class
 type ListingHandler struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *slog.Logger
 }
 
 // contructor of listing class
 // --> go idioms name of contructor start with New
-func NewListingHandler(db *sql.DB) *ListingHandler {
+func NewListingHandler(db *sql.DB, logger *slog.Logger) *ListingHandler {
 	return &ListingHandler{
 		// private readonly
-		db: db,
+		db:     db,
+		logger: logger,
 	}
 }
 
@@ -40,6 +41,8 @@ func NewListingHandler(db *sql.DB) *ListingHandler {
 // we use golang methods
 // in general this fuctions are termed as method function in opps terminology
 func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
+	this.logger.Debug("getting listings")
+
 	// Use the request-scoped context so the database query
 	// is cancelled if the client disconnects or the request ends.
 	ctx := r.Context()
@@ -47,14 +50,17 @@ func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
 	rows, err := this.db.QueryContext(
 		ctx,
 		`SELECT id, title, description, price, city, created_at
-		     FROM listings
-		     ORDER BY created_at DESC
-		     LIMIT 50`)
+			 FROM listings
+			 ORDER BY created_at DESC
+			 LIMIT 50`)
 	if err != nil {
-		log.Printf("db.Query: %v", err)
+		this.logger.Error("db.Query failed", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	this.logger.Debug("db.Query executed successfully")
+
 	// run at the last to close the connections
 	defer rows.Close()
 
@@ -69,22 +75,22 @@ func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
 			&l.City,
 			&l.CreatedAt,
 		); err != nil {
-			log.Printf("rows.Scan: %v", err)
+			this.logger.Error("rows.Scan failed", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-
 		listings = append(listings, l)
 	}
-
 	if err := rows.Err(); err != nil {
-		log.Printf("rows.Err: %v", err)
+		this.logger.Error("rows.Err failed", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	this.logger.Info("listings fetched successfully", "count", len(listings))
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-
 	// Serializes the listings slice into JSON
 	// and sends it to the client.
 	// send error automatically, if caught.
@@ -92,19 +98,27 @@ func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (this ListingHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	this.logger.Debug("deleting listing")
+
 	ctx := r.Context()
+
 	id := r.PathValue("id")
+
+	this.logger.Debug("listing id extracted", "id", id)
 
 	_, err := this.db.ExecContext(
 		ctx,
 		`DELETE FROM listings
 			WHERE id = $1`, id,
 	)
+
 	if err != nil {
-		log.Printf("delete: %v", err)
+		this.logger.Error("delete failed", "error", err, "id", id)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	this.logger.Info("listing deleted successfully", "id", id)
 
 	w.WriteHeader(http.StatusNoContent)
 }

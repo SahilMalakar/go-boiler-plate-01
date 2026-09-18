@@ -1,9 +1,10 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"io"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/config"
 	"github.com/sahil_malakar/production_grade_golang_setup/internal/db"
@@ -14,22 +15,54 @@ func main() {
 	// Loads application configuration from environment variables.
 	cfg := config.MustLoad()
 
+	// logger configurations
+	logFile, err := os.OpenFile(
+		"app.jsonl",
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+		0644,
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer logFile.Close()
+
+	writer := io.MultiWriter(
+		os.Stdout,
+		// logFile,
+	)
+
+	logHandler := slog.NewJSONHandler(
+		writer,
+		&slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelInfo,
+		},
+	)
+
+	logger := slog.New(logHandler)
+	slog.SetDefault(logger)
+
+	logger.Debug("application configuration loaded")
+
 	// Creates the PostgreSQL connection pool.
 	db, err := db.DbConnect(cfg.DatabaseURL, cfg.DB)
 	if err != nil {
-		log.Fatalf("Database connection failed: %v", err)
+		logger.Error("Database connection failed", "error", err)
 	}
-	log.Println("Database connection established")
+	logger.Info("Database connection established")
 	// Closes the database pool when the application exits.
 	defer db.Close()
 
-	fmt.Println("App server is running..")
+	logger.Info("App server is running..")
 
 	// Creates a router that receives incoming requests
 	// and forwards them to the handler registered for the matching route.
 	mux := http.NewServeMux()
 
-	listingHandler := handlers.NewListingHandler(db)
+	listingHandler := handlers.NewListingHandler(
+		db,
+		logger,
+	)
 
 	// Registers the GET /health route and executes this function
 	// whenever a request is made to that endpoint.
@@ -45,10 +78,10 @@ func main() {
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout,
 	}
-	log.Printf("Server is listening on http://localhost:%v", cfg.Port)
+	logger.Info("Server is listening on http://localhost:" + cfg.Port)
 
 	// Starts the server and keeps the application running while it accepts requests.
 	if err := srv.ListenAndServe(); err != nil {
-		log.Fatalf("Server failed: %v", err)
+		logger.Error("Server failed:", "error", err)
 	}
 }
