@@ -19,52 +19,85 @@ type listing struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
-// closure factory
-func List(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query(
-			`SELECT id, title, description, price, city, created_at
+// Converted closure factory patter to constructor factory pattern
+// to fix dependency injection problem
+
+// listing class
+type ListingHandler struct {
+	db *sql.DB
+}
+
+// contructor of listing class
+// --> go idioms name of contructor start with New
+func NewListingHandler(db *sql.DB) *ListingHandler {
+	return &ListingHandler{
+		// private readonly
+		db: db,
+	}
+}
+
+// now to attach the http handler with the construction
+// we use golang methods
+// in general this fuctions are termed as method function in opps terminology
+func (this ListingHandler) Get(w http.ResponseWriter, r *http.Request) {
+	rows, err := this.db.Query(
+		`SELECT id, title, description, price, city, created_at
 		     FROM listings
 		     ORDER BY created_at DESC
 		     LIMIT 50`)
-		if err != nil {
-			log.Printf("db.Query: %v", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		// run at the last to close the connections
-		defer rows.Close()
-
-		listings := []listing{}
-		for rows.Next() {
-			var l listing
-			if err := rows.Scan(
-				&l.ID,
-				&l.Title,
-				&l.Description,
-				&l.Price,
-				&l.City,
-				&l.CreatedAt,
-			); err != nil {
-				log.Printf("rows.Scan: %v", err)
-				http.Error(w, "internal error", http.StatusInternalServerError)
-				return
-			}
-
-			listings = append(listings, l)
-		}
-
-		if err := rows.Err(); err != nil {
-			log.Printf("rows.Err: %v", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-
-		// Serializes the listings slice into JSON
-		// and sends it to the client.
-		// send error automatically, if caught.
-		_ = json.NewEncoder(w).Encode(listings)
+	if err != nil {
+		log.Printf("db.Query: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
 	}
+	// run at the last to close the connections
+	defer rows.Close()
+
+	listings := []listing{}
+	for rows.Next() {
+		var l listing
+		if err := rows.Scan(
+			&l.ID,
+			&l.Title,
+			&l.Description,
+			&l.Price,
+			&l.City,
+			&l.CreatedAt,
+		); err != nil {
+			log.Printf("rows.Scan: %v", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		listings = append(listings, l)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Printf("rows.Err: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	// Serializes the listings slice into JSON
+	// and sends it to the client.
+	// send error automatically, if caught.
+	_ = json.NewEncoder(w).Encode(listings)
+}
+
+func (this ListingHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	_, err := this.db.Exec(
+		`DELETE FROM listings
+			WHERE id = $1`, id,
+	)
+	if err != nil {
+		log.Printf("delete: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

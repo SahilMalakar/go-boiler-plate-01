@@ -11,15 +11,16 @@ import (
 )
 
 func main() {
+	// Loads application configuration from environment variables.
 	cfg := config.MustLoad()
 
+	// Creates the PostgreSQL connection pool.
 	db, err := db.DbConnect(cfg.DatabaseURL, cfg.DB)
 	if err != nil {
 		log.Fatalf("Database connection failed: %v", err)
 	}
-
 	log.Println("Database connection established")
-
+	// Closes the database pool when the application exits.
 	defer db.Close()
 
 	fmt.Println("App server is running..")
@@ -28,12 +29,13 @@ func main() {
 	// and forwards them to the handler registered for the matching route.
 	mux := http.NewServeMux()
 
+	listingHandler := handlers.NewListingHandler(db)
+
 	// Registers the GET /health route and executes this function
 	// whenever a request is made to that endpoint.
 	mux.HandleFunc("GET /health", handlers.Health)
-	mux.HandleFunc("GET /listings", handlers.List(db))
-
-	log.Printf("Server is listening on http://localhost:%v", cfg.Port)
+	mux.HandleFunc("GET /listings", listingHandler.Get)
+	mux.HandleFunc("DELETE /listings/{id}", listingHandler.Delete)
 
 	// Creates the HTTP server and configures how it accepts and handles requests.
 	srv := http.Server{
@@ -43,6 +45,7 @@ func main() {
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout,
 	}
+	log.Printf("Server is listening on http://localhost:%v", cfg.Port)
 
 	// Starts the server and keeps the application running while it accepts requests.
 	if err := srv.ListenAndServe(); err != nil {
