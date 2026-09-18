@@ -69,6 +69,7 @@ func main() {
 	// whenever a request is made to that endpoint.
 	mux.HandleFunc("GET /health", handlers.Health)
 	mux.HandleFunc("GET /listings", listingHandler.Get)
+	mux.HandleFunc("POST /listings", listingHandler.Create)
 	mux.HandleFunc("DELETE /listings/{id}", listingHandler.Delete)
 
 	// Creates the HTTP server and configures how it accepts and handles requests.

@@ -144,3 +144,74 @@ func (this ListingHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (this ListingHandler) Create(w http.ResponseWriter, r *http.Request) {
+	this.logger.Debug("Create listing")
+
+	ctx := r.Context()
+	reqId := middleware.RequestIDFromContext(ctx)
+
+	var reqBody listing
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		this.logger.Error(
+			"failed to decode create list body",
+			"error", err,
+			"id", reqBody.ID,
+			"request_id", reqId,
+		)
+		httpx.Error(
+			w,
+			http.StatusBadRequest,
+			"invalid request body",
+			httpx.CodeMalformedJSON,
+		)
+		return
+	}
+
+	row := this.db.QueryRowContext(
+		ctx,
+		`INSERT INTO listings
+		(title, description, price, city)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, title, description, price, city, created_at`,
+		reqBody.Title,
+		reqBody.Description,
+		reqBody.Price,
+		reqBody.City,
+	)
+
+	var createdListing listing
+	if err := row.Scan(
+		&createdListing.ID,
+		&createdListing.Title,
+		&createdListing.Description,
+		&createdListing.Price,
+		&createdListing.City,
+		&createdListing.CreatedAt,
+	); err != nil {
+		this.logger.Error(
+			"failed to insert list body",
+			"error", err,
+			"id", reqBody.ID,
+			"request_id", reqId,
+		)
+		httpx.Error(
+			w,
+			http.StatusInternalServerError,
+			"something went wrong",
+			httpx.CodeInternalError,
+		)
+		return
+	}
+
+	this.logger.Info(
+		"listing created successfully",
+		"id", createdListing.ID,
+		"request_id", reqId,
+	)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	_ = json.NewEncoder(w).Encode(createdListing)
+}
